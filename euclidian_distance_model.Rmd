@@ -1,0 +1,90 @@
+---
+title: "euclidian_distance_model"
+output: html_document
+date: "2024-10-20"
+---
+
+```{r}
+# Load necessary libraries
+library(class)  
+library(dplyr)  
+library(caret) 
+library(ggplot2)  
+
+# Load your dataset (assuming it's a CSV file)
+data <- read.csv('dataset.csv')
+
+# Group by 'artists' and calculate the mean of the other columns
+data_grouped <- data %>%
+  group_by(artists) %>%
+  summarise(
+    mean_danceability = mean(danceability, na.rm = TRUE),
+    mean_energy = mean(energy, na.rm = TRUE),
+    mean_acousticness = mean(acousticness, na.rm = TRUE),
+    mean_instrumentalness = mean(instrumentalness, na.rm = TRUE),
+    mean_liveness = mean(liveness, na.rm = TRUE),
+    mean_speechiness = mean(speechiness, na.rm = TRUE),
+    mean_valence = mean(valence, na.rm = TRUE)
+  )
+
+# Create the new data point (cluster center, what user will "input")
+new_data <- data.frame(mean_danceability = 0.8, 
+                       mean_energy = 0.7, 
+                       mean_acousticness = 0.1, 
+                       mean_instrumentalness = 0.05, 
+                       mean_liveness = 0.4, 
+                       mean_speechiness = 0.2, 
+                       mean_valence = 0.6)
+
+grouped_predictors <- data_grouped %>%
+  select(mean_danceability, mean_energy, mean_acousticness, mean_instrumentalness, mean_liveness, 
+         mean_speechiness, mean_valence)
+
+# Calculate Euclidean distances between each artist's feature values and the new_data
+distances <- apply(grouped_predictors, 1, function(row) {
+  sqrt(sum((row - new_data)^2))
+})
+
+# Add the distances to the original data
+data_grouped$distance_to_new_data <- distances
+
+# Sort the data by the distance and return the top 20 closest artists
+top_20_closest_artists <- data_grouped %>%
+  arrange(distance_to_new_data) %>%
+  slice(1:20)
+
+# View the result
+print(top_20_closest_artists)
+```
+
+```{r}
+# Select a random value from the 'artists' column. In practice the user would choose the artist
+random_artist <- sample(top_20_closest_artists$artists, 1)
+
+# create dataframe filtering for just the selected artist
+artist_songs = data[data$artists == random_artist,]
+
+song_predictors = artist_songs %>%
+  select(danceability, energy, acousticness, instrumentalness, liveness, 
+         speechiness, valence)
+
+# Calculate Euclidean distances between each songs feature values and the new_data (user input)
+song_distances <- apply(song_predictors, 1, function(row) {
+  sqrt(sum((row - new_data)^2))
+})
+
+# Add the distances to the original data
+artist_songs$distance_to_new_data <- song_distances
+
+# Step 6: Sort the data by the distance and return the top song
+top_song <- artist_songs %>%
+  arrange(distance_to_new_data) %>%
+  slice(1:1)
+
+# View the result
+print(top_song)
+```
+
+
+
+
