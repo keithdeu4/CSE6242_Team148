@@ -7,6 +7,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.cluster import KMeans
+import pyvis.network as net
+from streamlit.components.v1 import html
 
 # ---------------------------------------------
 # Generate Synthetic Data
@@ -146,7 +148,7 @@ with st.sidebar:
         # Option to clear the playlist
         if st.button("Clear Playlist"):
             st.session_state.playlist = []
-            st.experimental_rerun()
+            st.rerun()
 
     # Preferences Panel
     with st.expander("🏛️ Adjust Your Music Preferences", expanded=False):
@@ -232,22 +234,21 @@ def chatbot():
             top_artists = find_top_k_artists(st.session_state.user_preferences, artist_profiles, k=5)
 
             # Create a graph using NetworkX
-            G = nx.Graph()
+            graph = net.Network(height="750px", width="100%", bgcolor="#222222", font_color="white")
             for idx, artist in top_artists.iterrows():
-                G.add_node(artist['artist_name'], similarity=artist['similarity'])
+                graph.add_node(artist['artist_name'], title=f"Cluster: {artist['cluster']}, Similarity: {artist['similarity']:.2f}")
+            
             for i, artist1 in enumerate(top_artists['artist_name']):
                 for j, artist2 in enumerate(top_artists['artist_name']):
                     if i < j:
-                        # Add edges between all nodes to show connections
-                        G.add_edge(artist1, artist2, weight=np.random.rand())
-
-            # Draw the graph using matplotlib
-            plt.figure(figsize=(10, 8))
-            pos = nx.spring_layout(G)
-            nx.draw(G, pos, with_labels=True, node_size=1500, node_color='skyblue', font_size=10, font_weight='bold', edge_color='gray')
-            labels = nx.get_edge_attributes(G, 'weight')
-            nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-            st.pyplot(plt)
+                        # Add edges between nodes to show connections
+                        graph.add_edge(artist1, artist2)
+            
+            # Save and display the interactive graph
+            graph.save_graph("artist_graph.html")
+            with open("artist_graph.html", "r") as f:
+                html_code = f.read()
+            html(html_code, height=750)
 
             # Ask if the user wants to find another song
             st.session_state.messages.append({
