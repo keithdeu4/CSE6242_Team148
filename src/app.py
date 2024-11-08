@@ -12,7 +12,16 @@ with st.sidebar:
     with st.expander("🎵 Your Playlist", expanded=True):
         if st.session_state.playlist:
             for idx, song in enumerate(st.session_state.playlist, 1):
-                st.write(f"{idx}. **{song['track_name']}** by {song['artist_name']}")
+                # Create two columns: one for text and one for image
+                col1, col2 = st.columns([3, 1])  # Adjust column width ratios as needed
+                
+                with col1:
+                    # Display song title and artist in the first column
+                    st.write(f"{idx}. **{song['track_name']}** by {song['artist_name']}")
+                
+                with col2:
+                    # Display song image in the second column
+                    st.image(song["image"], use_column_width=True)
         else:
             st.write("Your playlist is empty.")
         if st.button("Clear Playlist"):
@@ -24,21 +33,71 @@ with st.sidebar:
             "Use the sliders below to set how much you care about each feature:"
         )
         features = {
-            "danceability": "Danceability",
-            "energy": "Energy",
-            "acousticness": "Acousticness",
-            "instrumentalness": "Instrumentalness",
-            "liveness": "Liveness",
-            "valence": "Positiveness (Valence)",
+            "danceability": {
+                "name": "Danceability",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "default": 0.5
+            },
+            "energy": {
+                "name": "Energy",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "default": 0.5
+            },
+            "acousticness": {
+                "name": "Acousticness",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "default": 0.5
+            },
+            "instrumentalness": {
+                "name": "Instrumentalness",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "default": 0.5
+            },
+            "liveness": {
+                "name": "Liveness",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "default": 0.5
+            },
+            "valence": {
+                "name": "Positiveness (Valence)",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "default": 0.5
+            },
+            "loudness": {
+                "name": "Loudness (dB)",
+                "min": -30.0,
+                "max": 0.0,
+                "step": 0.5,
+                "default": -15.0
+            },
+            "popularity": {
+                "name": "Popularity",
+                "min": 0,
+                "max": 100,
+                "step": 1,
+                "default": 50
+            }
         }
 
-        for feature_key, feature_name in features.items():
+        for feature_key, feature_info in features.items():
             st.session_state.user_preferences[feature_key] = st.slider(
-                feature_name,
-                min_value=0.0,
-                max_value=1.0,
-                value=st.session_state.user_preferences.get(feature_key, 0.5),
-                step=0.01,
+                feature_info["name"],
+                min_value=feature_info["min"],
+                max_value=feature_info["max"],
+                value=st.session_state.user_preferences.get(feature_key, feature_info["default"]),
+                step=feature_info["step"],
                 key=feature_key,
             )
 

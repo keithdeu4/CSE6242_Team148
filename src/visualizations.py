@@ -22,20 +22,29 @@ def plot_pca_visualization(artist_profiles, user_preferences):
     artist_profiles["Type"] = "Artist"
     preferences["Type"] = "User"
 
-    # Concatenate artist profiles with user preferences and check feature alignment
-    combined_data = pd.concat(
-        [artist_profiles, preferences], ignore_index=False
-    ).reset_index(drop=True)
-    feature_names = list(
-        user_preferences.keys()
-    )  # Ensure feature_names are columns present in combined data
+    # Ensure `Type` column exists in both DataFrames
+    artist_profiles = artist_profiles.copy()
+    artist_profiles["Type"] = "Artist"
+    preferences["Type"] = "User"
 
-    # Ensure the combined data does not have NaNs in feature columns
-    if combined_data[feature_names].isnull().values.any():
-        st.error(
-            "Combined data contains NaN values. Please ensure all features are numeric and present."
-        )
-        return
+    default_values = {
+        "danceability": 0.5,
+        "energy": 0.5,
+        "acousticness": 0.5,
+        "instrumentalness": 0.5,
+        "liveness": 0.5,
+        "valence": 0.5,
+        "loudness": -15.0,
+        "popularity": 0
+    }
+    
+    # Concatenate the data
+    combined_data = pd.concat([artist_profiles, preferences], ignore_index=False).reset_index(drop=True)
+    feature_names = list(user_preferences.keys())
+    
+    # Fill NaN values with defaults for each feature
+    for feature in feature_names:
+        combined_data[feature] = combined_data[feature].fillna(default_values.get(feature, 0.5))
 
     # Perform PCA on feature columns
     pca = PCA(n_components=2)

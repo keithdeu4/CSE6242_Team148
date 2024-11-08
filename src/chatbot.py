@@ -68,6 +68,7 @@ def chatbot():
                 {
                     "track_name": best_song["track_name"],
                     "artist_name": best_song["artist_name"],
+                    "image":best_song["image"]
                 }
             )
 
@@ -88,10 +89,61 @@ def chatbot():
             top_artists = filtered_artists.head(10)
 
             # Create a PyVis network graph of the selected artist and similar artists
+            default_image = "https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228"  # Spotify default image
+                
             graph = Network(
-                height="750px", width="100%", bgcolor="#222222", font_color="white"
+                height="750px", 
+                width="100%", 
+                bgcolor="#222222", 
+                font_color="white"
             )
-            selected_artist_hover_info = (
+            
+            # Configure physics and other options
+            graph.set_options('''{
+                "physics": {
+                    "forceAtlas2Based": {
+                        "gravitationalConstant": -100,
+                        "springLength": 250,
+                        "springConstant": 0.09
+                    },
+                    "minVelocity": 0.75,
+                    "solver": "forceAtlas2Based",
+                    "stabilization": {
+                        "enabled": true,
+                        "iterations": 50
+                    }
+                },
+                "nodes": {
+                    "font": {
+                        "size": 16,
+                        "color": "white",
+                        "strokeWidth": 3,
+                        "strokeColor": "rgba(0, 0, 0, 0.7)"
+                    },
+                    "borderWidth": 2,
+                    "borderWidthSelected": 4,
+                    "size": 50,
+                    "shape": "circularImage",
+                    "shapeProperties": {
+                        "useBorderWithImage": true,
+                        "interpolation": true
+                    }
+                },
+                "edges": {
+                    "smooth": {
+                        "type": "continuous",
+                        "forceDirection": "none"
+                    },
+                    "color": {
+                        "inherit": "both",
+                        "opacity": 0.6
+                    },
+                    "width": 0.15
+                }
+            }''')
+
+            # Add central node for the selected artist
+            hover_info = (
                 f"Name: {selected_artist_profile['artist_name']}\n"
                 f"Popularity: {selected_artist_profile['artist_popularity']:.0f}\n"
                 f"Danceability: {selected_artist_profile['danceability']:.2f}\n"
@@ -101,16 +153,26 @@ def chatbot():
                 f"Liveness: {selected_artist_profile['liveness']:.2f}"
             )
 
-            # Add central node for the selected artist
+            # Make sure we're accessing the image URL correctly
+            main_artist_image = selected_artist_profile.get('images', [{'url': default_image}])[0]['url'] if isinstance(selected_artist_profile.get('images'), list) else selected_artist_profile.get('artist_image_url', default_image)
+
             graph.add_node(
                 artist_name,
-                title=selected_artist_hover_info,
-                color="red",
-                shape="star",
+                title=hover_info,
+                label=artist_name,
+                image=main_artist_image,
+                shape='circularImage',
+                size=60,
+                borderWidth=3,
+                color="#FF4444"
             )
 
-            # Add nodes for each recommended artist and connect them to the selected artist node
-            for _, artist in top_artists.iterrows():
+            # Sort artists by similarity
+            MAX_SIMILAR_ARTISTS = 8
+            sorted_artists = top_artists.sort_values('similarity', ascending=False).head(MAX_SIMILAR_ARTISTS)
+
+            # Add nodes for each recommended artist
+            for _, artist in sorted_artists.iterrows():
                 if artist["artist_name"] in last_ten_artists:
                     continue
 
@@ -125,46 +187,61 @@ def chatbot():
                     f"Liveness: {artist['liveness']:.2f}"
                 )
 
+                # Handle image URL access for each artist
+                artist_image = artist.get('images', [{'url': default_image}])[0]['url'] if isinstance(artist.get('images'), list) else artist.get('artist_image_url', default_image)
+
                 graph.add_node(
                     artist["artist_name"],
                     title=hover_info,
-                    color="#1DB954",
+                    label=artist["artist_name"],
+                    image=artist_image,
+                    shape='circularImage',
+                    size=50,
+                    borderWidth=2,
+                    color="#1DB954"
                 )
 
-                similarity_score = artist["similarity"]
+                # Add edge with width based on similarity
+                edge_width = artist["similarity"] * 2
                 graph.add_edge(
                     artist_name,
                     artist["artist_name"],
-                    value=similarity_score,
-                    title=f"Similarity: {similarity_score:.2f}",
+                    value=artist["similarity"],
+                    width=edge_width,
+                    title=f"Similarity: {artist['similarity']:.2f}",
                 )
 
-            # Add connections between similar artists based on a similarity threshold
-            similarity_threshold = 0.7
-            for i, artist1 in top_artists.iterrows():
-                for j, artist2 in top_artists.iterrows():
+            # Add connections between similar artists
+            similarity_threshold = 0.85
+            max_secondary_connections = 3
+            
+            for i, artist1 in sorted_artists.iterrows():
+                secondary_connections = 0
+                for j, artist2 in sorted_artists.iterrows():
                     if (
-                        i < j
+                        i < j 
                         and artist1["artist_name"] != artist_name
                         and artist2["artist_name"] != artist_name
+                        and secondary_connections < max_secondary_connections
                     ):
                         similarity_score = artist1["similarity"] * artist2["similarity"]
                         if similarity_score > similarity_threshold:
+                            edge_width = (similarity_score - similarity_threshold) * 2
                             graph.add_edge(
                                 artist1["artist_name"],
                                 artist2["artist_name"],
                                 value=similarity_score,
+                                width=edge_width,
                                 title=f"Similarity: {similarity_score:.2f}",
                             )
+                            secondary_connections += 1
 
-            # Save the generated graph as an HTML file with a unique filename
+            # Save the generated graph
             unique_file_name = f"artist_graph_{int(time.time())}.html"
             graph.save_graph(unique_file_name)
 
-            # Read the HTML graph to include it in the Streamlit chat UI
             with open(unique_file_name, "r", encoding="utf-8") as f:
                 graph_html = f.read()
-
             # Add a response with the best song recommendation and visualization
             response = f"The best matching song by **{artist_name}** is **{best_song['track_name']}**! It has been added to your playlist.\n\nHere's a visualization of similar artists based on your preferences:"
             st.session_state.messages.append(

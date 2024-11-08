@@ -60,7 +60,6 @@ def find_best_song(artist_id, user_preferences):
     """
     conn = get_connection()
     songs_df = pd.read_sql_query(GET_SONGS_FOR_ARTIST, conn, params=(artist_id,))
-    print(songs_df)
     conn.close()
 
     if songs_df.empty:
@@ -75,6 +74,7 @@ def find_best_song(artist_id, user_preferences):
             "instrumentalness",
             "liveness",
             "valence",
+            "loudness"
         ]
     ]
     song_distances = np.sqrt(
@@ -89,6 +89,7 @@ def find_best_song(artist_id, user_preferences):
     return {
         "artist_name": top_song["artist_name"],
         "track_name": top_song["track_name"],
+        "image": top_song["album_image_url"]
     }
 
 
