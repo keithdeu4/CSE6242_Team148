@@ -60,6 +60,7 @@ def find_best_song(artist_id, user_preferences):
     """
     conn = get_connection()
     songs_df = pd.read_sql_query(GET_SONGS_FOR_ARTIST, conn, params=(artist_id,))
+    print(songs_df)
     conn.close()
 
     if songs_df.empty:

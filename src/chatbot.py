@@ -93,7 +93,7 @@ def chatbot():
             )
             selected_artist_hover_info = (
                 f"Name: {selected_artist_profile['artist_name']}\n"
-                f"Popularity: {selected_artist_profile['popularity']:.0f}\n"
+                f"Popularity: {selected_artist_profile['artist_popularity']:.0f}\n"
                 f"Danceability: {selected_artist_profile['danceability']:.2f}\n"
                 f"Energy: {selected_artist_profile['energy']:.2f}\n"
                 f"Acousticness: {selected_artist_profile['acousticness']:.2f}\n"
@@ -117,7 +117,7 @@ def chatbot():
                 hover_info = (
                     f"Name: {artist['artist_name']}\n"
                     f"Similarity: {artist['similarity']:.2f}\n"
-                    f"Popularity: {artist['popularity']:.0f}\n"
+                    f"Popularity: {artist['artist_popularity']:.0f}\n"
                     f"Danceability: {artist['danceability']:.2f}\n"
                     f"Energy: {artist['energy']:.2f}\n"
                     f"Acousticness: {artist['acousticness']:.2f}\n"
