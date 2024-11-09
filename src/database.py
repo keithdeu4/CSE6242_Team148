@@ -13,11 +13,11 @@ def get_connection():
         sqlite3.Connection: Connection object to interact with the database.
     """
     conn = sqlite3.connect(r"assets\music_data.db")
-    tracks_csv = r'\assets\tracks.csv'
-    albums_csv = r'\assets\albums.csv'
-    artists_csv = r'\assets\artists.csv'
-    track_artists_csv = r'\assets\track_artists.csv'
-    track_features_csv = r'\track_features.csv'
+    tracks_csv = r'assets\tracks.csv'
+    albums_csv = r'assets\albums.csv'
+    artists_csv = r'assets\artists.csv'
+    track_artists_csv = r'assets\track_artists.csv'
+    track_features_csv = r'track_features.csv'
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS tracks (
         track_id TEXT PRIMARY KEY,
