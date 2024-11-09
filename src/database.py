@@ -12,7 +12,7 @@ def get_connection():
     Returns:
         sqlite3.Connection: Connection object to interact with the database.
     """
-    return sqlite3.connect("assets\music_data.db")
+    return sqlite3.connect(r"assets\music_data.db")
 
 
 def get_artist_profile(artist_id):
