@@ -132,17 +132,6 @@ def get_connection():
     conn.commit()
     return conn
 
-
-
-# Create tables and load data
-
-# Tracks Table
-cursor.execute("DROP TABLE IF EXISTS tracks")
-c
-conn.close()
-
-
-
 def get_artist_profile(artist_id):
     """Fetch a specific artist's profile from the database.
 
