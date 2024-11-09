@@ -1,0 +1,230 @@
+import openpyxl as openpyxl
+import aiohttp
+import asyncio
+import random
+import string
+import pandas as pd
+import base64
+import time
+import os
+
+# Spotify API credentials
+client_id_lst = ['171c8310ee6a49bf9ba7b13911ad3c26','4e1838255db040588825f9b927fad28b']
+client_secret_lst = ['8bfd6423ec9342ff8c020857bf2ca934','15346950cf834351a3d6f3a961b5d0ab']
+
+
+# File path to new or existing Excel file with downloaded data
+file_path = r"D:\Downloads\CSE6242\Spotifty_songs_CSE6242.csv"
+
+
+# Step 1: Encode Client ID and Client Secret
+async def get_access_token(client_id, client_secret):
+    client_creds = f"{client_id}:{client_secret}"
+    client_creds_b64 = base64.b64encode(client_creds.encode()).decode()
+
+    token_url = 'https://accounts.spotify.com/api/token'
+    headers = {'Authorization': f'Basic {client_creds_b64}'}
+    data = {'grant_type': 'client_credentials'}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(token_url, headers=headers, data=data) as r:
+            if r.status == 200:
+                return (await r.json())['access_token']
+            else:
+                raise Exception("Failed to get access token", r.status, await r.text())
+
+async def get_access_tokens(client_ids, client_secrets):
+    # Ensure the lengths of client_ids and client_secrets match
+    if len(client_ids) != len(client_secrets):
+        raise ValueError("Client IDs and secrets must have the same length.")
+
+    tasks = []
+    for client_id, client_secret in zip(client_ids, client_secrets):
+        tasks.append(get_access_token(client_id, client_secret))
+
+    # Gather all access token tasks concurrently
+    access_tokens = await asyncio.gather(*tasks)
+    return access_tokens
+
+
+# Main asynchronous function to collect tracks
+async def main():
+    # Get the access token
+    access_token_lst = await get_access_tokens(client_id_lst, client_secret_lst)
+
+    # Function to generate random search queries
+    def get_random_query():
+        return ''.join(random.choice(string.ascii_lowercase) for _ in range(random.randint(3, 5)))
+
+    # Function to handle API rate limits
+    async def handle_rate_limit(response):
+        if response.status == 429:
+            retry_after = int(response.headers.get('Retry-After', 30))
+            print(f'Hit rate limit. Sleeping for {retry_after} seconds.')
+            await asyncio.sleep(retry_after)
+            return True
+        return False
+
+    # Function to search for random tracks
+    async def search_random_tracks(session, access_token, query, limit=10):
+        url = "https://api.spotify.com/v1/search"
+        headers = {'Authorization': f'Bearer {access_token}'}
+        params = {'q': query, 'type': 'track', 'limit': limit}
+
+
+        while True:
+            async with session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    return (await response.json())['tracks']['items']
+                elif await handle_rate_limit(response):
+                    continue
+                else:
+                    return None
+
+    # Function to get audio features
+    async def get_audio_features(session, track_id, access_token):
+        url = f"https://api.spotify.com/v1/audio-features/{track_id}"
+        headers = {'Authorization': f'Bearer {access_token}'}
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                return None
+
+    # Function to get artist metadata
+    async def get_artist_metadata(session, artist_id, access_token):
+        url = f"https://api.spotify.com/v1/artists/{artist_id}"
+        headers = {'Authorization': f'Bearer {access_token}'}
+
+
+        while True:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    artist_data = await response.json()
+                    artist_image_url = artist_data['images'][0]['url'] if artist_data['images'] else None
+                    return {
+                        'genres': artist_data.get('genres', []),
+                        'artist_popularity': artist_data.get('popularity'),
+                        'artist_followers': artist_data['followers']['total'],
+                        'artist_external_url': artist_data['external_urls']['spotify'],
+                        'artist_image_url': artist_image_url
+                    }
+                elif await handle_rate_limit(response):
+                    continue
+                else:
+                    return {
+                        'genres': [],
+                        'artist_popularity': None,
+                        'artist_followers': None,
+                        'artist_external_url': None,
+                        'artist_image_url': None
+                    }
+
+    # Function to combine track metadata and audio features
+    async def get_combined_data(session, track, access_token):
+        track_id = track['id']
+        audio_features = await get_audio_features(session, track_id, access_token)
+        if audio_features:
+            artist_id = track['artists'][0]['id']
+            artist_metadata = await get_artist_metadata(session, artist_id, access_token)
+            album_image_url = track['album']['images'][0]['url'] if track['album']['images'] else None
+
+            track_info = {
+                'track_id': track_id,
+                'artists': ', '.join([artist['name'] for artist in track['artists']]),
+                'album_name': track['album']['name'],
+                'release_date': track['album']['release_date'],
+                'album_image_url': album_image_url,
+                'track_name': track['name'],
+                'popularity': track['popularity'],
+                'duration_ms': track['duration_ms'],
+                'explicit': track['explicit'],
+                'available_markets': ', '.join(track.get('available_markets', [])),
+                'track_external_url': track['external_urls']['spotify'],
+                'track_genre': ', '.join(artist_metadata['genres']),
+                'artist_popularity': artist_metadata['artist_popularity'],
+                'artist_followers': artist_metadata['artist_followers'],
+                'artist_image_url': artist_metadata['artist_image_url'],
+                'artist_external_url': artist_metadata['artist_external_url']
+            }
+            return {**track_info, **audio_features}
+        return None
+
+    async def collect_random_tracks(access_token_lst, num_tracks=900000):
+        df_list = pd.DataFrame()
+        start_time = time.time()
+        total_collected = 0
+        batch_size = 5  # Increase to fetch more tracks in each request
+
+
+
+        async with aiohttp.ClientSession() as session:
+
+            valid_timer = time.time()
+
+            while total_collected < num_tracks:
+                print(time.time() - valid_timer)
+                # Check if we are approaching an hour since the access tokens were created
+                if time.time() - valid_timer >= 60:
+                    print('changed token')
+                    valid_timer = time.time()
+                    access_token_lst = await get_access_tokens(client_id_lst, client_secret_lst)
+
+
+                for access_token in access_token_lst:
+                    queries = [get_random_query() for _ in range(1)]
+                    tasks = []
+
+
+
+
+                    # Create tasks for multiple queries
+                    for query in queries:
+                        tasks.append(search_random_tracks(session, access_token, query, limit=batch_size))
+
+                    # Gather all the search tasks
+                    random_tracks_lists = await asyncio.gather(*tasks)
+
+                    # Flatten the list of track lists and remove None values
+                    if random_tracks_lists:
+                        random_tracks = [track for tracks in random_tracks_lists if tracks for track in tracks if track]
+
+                    if random_tracks:
+                        async def fetch_with_delay(session, track, access_token):
+                            combined_data = await get_combined_data(session, track, access_token)
+                            await asyncio.sleep(1)  # Pause after fetching
+                            return combined_data
+
+                        # Create tasks for concurrent fetching
+                        track_tasks = [fetch_with_delay(session, track, access_token) for track in random_tracks]
+
+                        # Gather results concurrently
+                        combined_data_list = await asyncio.gather(*track_tasks)
+
+                        for combined_data in combined_data_list:
+                            if isinstance(combined_data, dict):
+                                # turn dict into a pandas dataframe
+                                new_row = pd.DataFrame([combined_data])
+
+                                # Append new row to the CSV
+                                new_row.to_csv(file_path, mode='a', index=False, header=not os.path.exists(file_path))
+
+                                total_collected += 1
+                                print(f"{total_collected} tracks collected.")
+
+
+
+                            # Break if we've collected the desired number of tracks
+                            if total_collected >= num_tracks:
+                                break
+
+        end_time = time.time()
+        print(f"{end_time - start_time:.2f} seconds to complete search and export.")
+
+    # Collect random tracks
+    await collect_random_tracks(access_token_lst)
+
+
+# Call the main function
+if __name__ == "__main__":
+    asyncio.run(main())
