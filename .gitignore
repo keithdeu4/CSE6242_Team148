@@ -43,5 +43,4 @@ streamlit_app.log
 # System files
 .DS_Store
 Thumbs.db
-*.html
 /lib

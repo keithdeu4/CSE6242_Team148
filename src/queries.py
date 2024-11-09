@@ -14,7 +14,7 @@ JOIN artists ON artists.artist_id = artist_profiles.artist_id
 """
 
 GET_SONGS_FOR_ARTIST = """
-SELECT tracks.*, track_features.*, artists.artist_name, albums.album_image_url
+SELECT tracks.*, track_features.*, artists.artist_name, albums.album_image_url, albums.album_name
 FROM tracks
 JOIN track_features ON tracks.track_id = track_features.track_id
 JOIN track_artists ON track_artists.track_id = tracks.track_id

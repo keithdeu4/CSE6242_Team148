@@ -2830,6 +2830,17 @@ files = [
 ]
 
 [[package]]
+name = "sortables"
+version = "0.1.1"
+description = "sanely sortable Python data structures"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "sortables-0.1.1-py3-none-any.whl", hash = "sha256:2780a1e195700e691e1783fca749562a1af6d88e7ff765279c862581f0079304"},
+    {file = "sortables-0.1.1.tar.gz", hash = "sha256:adc61b83ab36e6d759a792293d83501d4c0b2f17e6cd98229855e9af4eb3495c"},
+]
+
+[[package]]
 name = "spotipy"
 version = "2.24.0"
 description = "A light weight Python library for the Spotify Web API"
@@ -2919,6 +2930,20 @@ watchdog = {version = ">=2.1.5,<6", markers = "platform_system != \"Darwin\""}
 
 [package.extras]
 snowflake = ["snowflake-connector-python (>=2.8.0)", "snowflake-snowpark-python[modin] (>=1.17.0)"]
+
+[[package]]
+name = "streamlit-sortables"
+version = "0.2.0"
+description = "A Streamlit component to provide sortable list."
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "streamlit_sortables-0.2.0-py3-none-any.whl", hash = "sha256:62dcac58eb25ff12a7cce748d2b56d20fdb917d93bffd6d008f96bc96b920018"},
+    {file = "streamlit_sortables-0.2.0.tar.gz", hash = "sha256:b82b3e27255a7f02b25c97a5d212edc067aff5613ce568e4fecb17bb98daffd0"},
+]
+
+[package.dependencies]
+streamlit = ">=1.0.0"
 
 [[package]]
 name = "tenacity"
@@ -3214,4 +3239,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "20cfaa3dce16fb15783354584a190faf86b1ec12d52a1a71551b6ef08307f6ea"
+content-hash = "b292352c6b03d4c68336deaf6c077bcf5d7bcc85d07deb8c352cedd425d8a7ac"

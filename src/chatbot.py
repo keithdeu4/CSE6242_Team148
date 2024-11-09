@@ -68,7 +68,11 @@ def chatbot():
                 {
                     "track_name": best_song["track_name"],
                     "artist_name": best_song["artist_name"],
-                    "image":best_song["image"]
+                    "album_image_url":best_song["album_image_url"],
+                    'album_name': best_song['album_name'],
+                    'popularity': best_song['popularity'],
+                    'uri': best_song['uri'],
+                    "track_external_url": best_song["track_external_url"]
                 }
             )
 
