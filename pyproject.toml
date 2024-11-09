@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "cse6242_team148"
+name = "spotify-graph-playlist"
 version = "0.1.0"
 description = "A Graph Based Spotify Playlist Generator"
 authors = [
@@ -11,6 +11,9 @@ authors = [
     "Christain Ore <core3@gatech.edu>"
 ]
 readme = "README.md"
+
+[tool.poetry.package]
+include = ["src"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
