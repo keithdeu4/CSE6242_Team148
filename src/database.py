@@ -12,7 +12,135 @@ def get_connection():
     Returns:
         sqlite3.Connection: Connection object to interact with the database.
     """
-    return sqlite3.connect(r"assets\music_data.db")
+    conn = sqlite3.connect(r"assets\music_data.db")
+    tracks_csv = r'\assets\tracks.csv'
+    albums_csv = r'\assets\albums.csv'
+    artists_csv = r'\assets\artists.csv'
+    track_artists_csv = r'\assets\track_artists.csv'
+    track_features_csv = r'\track_features.csv'
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS tracks (
+        track_id TEXT PRIMARY KEY,
+        track_name TEXT,
+        popularity INTEGER,
+        duration_ms INTEGER,
+        explicit BOOLEAN,
+        track_external_url TEXT,
+        type TEXT,
+        id TEXT,
+        uri TEXT,
+        track_href TEXT,
+        analysis_url TEXT,
+        time_signature INTEGER,
+        album_id TEXT
+    )''')
+    pd.read_csv(tracks_csv).to_sql('tracks', conn, if_exists='replace', index=False)
+
+    # Albums Table
+    cursor.execute("DROP TABLE IF EXISTS albums")
+    cursor.execute('''CREATE TABLE IF NOT EXISTS albums (
+        album_id TEXT PRIMARY KEY,
+        album_name TEXT,
+        release_date TEXT,
+        album_image_url TEXT
+    )''')
+    pd.read_csv(albums_csv).to_sql('albums', conn, if_exists='replace', index=False)
+
+    # Artists Table with Auto-Incrementing artist_id
+    cursor.execute("DROP TABLE IF EXISTS artists")
+    cursor.execute('''CREATE TABLE IF NOT EXISTS artists (
+        artist_id TEXT PRIMARY KEY,
+        artist_name TEXT,
+        artist_popularity INTEGER,
+        artist_followers INTEGER,
+        artist_image_url TEXT,
+        artist_external_url TEXT
+    )''')
+    pd.read_csv(artists_csv).to_sql('artists', conn, if_exists='replace', index=False)
+
+    # Track_Artists Table (Many-to-Many relationship) with foreign keys
+    cursor.execute("DROP TABLE IF EXISTS track_artists")
+    cursor.execute('''CREATE TABLE IF NOT EXISTS track_artists (
+        track_id TEXT,
+        artist_id INTEGER,
+        FOREIGN KEY (track_id) REFERENCES tracks (track_id),
+        FOREIGN KEY (artist_id) REFERENCES artists (artist_id)
+    )''')
+    pd.read_csv(track_artists_csv).to_sql('track_artists', conn, if_exists='replace', index=False)
+
+    # Track Features Table
+    cursor.execute("DROP TABLE IF EXISTS track_features")
+    cursor.execute('''CREATE TABLE IF NOT EXISTS track_features (
+        track_id TEXT PRIMARY KEY,
+        danceability REAL,
+        energy REAL,
+        key INTEGER,
+        loudness REAL,
+        mode INTEGER,
+        speechiness REAL,
+        acousticness REAL,
+        instrumentalness REAL,
+        liveness REAL,
+        valence REAL,
+        tempo REAL,
+        FOREIGN KEY (track_id) REFERENCES tracks (track_id)
+    )''')
+    pd.read_csv(track_features_csv).to_sql('track_features', conn, if_exists='replace', index=False)
+
+    # Create Artist_profiles Table
+    cursor.execute("DROP TABLE IF EXISTS artist_profiles")
+    cursor.execute('''CREATE TABLE IF NOT EXISTS artist_profiles (
+        artist_id INTEGER PRIMARY KEY,
+        danceability REAL,
+        energy REAL,
+        key INTEGER,
+        loudness REAL,
+        mode INTEGER,
+        speechiness REAL,
+        acousticness REAL,
+        instrumentalness REAL,
+        liveness REAL,
+        valence REAL,
+        tempo REAL,
+        FOREIGN KEY (artist_id) REFERENCES artists (artist_id)
+    )''')
+
+    # Load artist and track feature data
+    track_features_df = pd.read_csv(track_features_csv)
+    track_artists_df = pd.read_csv(track_artists_csv)
+
+    # Merge track features with artist-track mapping
+    artist_features_df = track_artists_df.merge(track_features_df, on='track_id')
+
+    # Aggregate features by artist
+    artist_profiles_df = artist_features_df.groupby('artist_id').agg({
+        'danceability': 'mean',
+        'energy': 'mean',
+        'loudness': 'mean',
+        'speechiness': 'mean',
+        'acousticness': 'mean',
+        'instrumentalness': 'mean',
+        'liveness': 'mean',
+        'valence': 'mean',
+        'tempo': 'mean',
+    }).reset_index()
+
+    # Insert aggregated data into the artist_profiles table
+    artist_profiles_df.to_sql('artist_profiles', conn, if_exists='replace', index=False)
+
+    # Commit changes and close the connection
+    conn.commit()
+    return conn
+
+
+
+# Create tables and load data
+
+# Tracks Table
+cursor.execute("DROP TABLE IF EXISTS tracks")
+c
+conn.close()
+
 
 
 def get_artist_profile(artist_id):
