@@ -5,6 +5,13 @@ import pandas as pd
 
 from queries import GET_ALL_ARTIST_PROFILES, GET_ARTIST_PROFILE, GET_SONGS_FOR_ARTIST
 
+from pathlib import Path
+
+# Get the directory containing your streamlit app
+BASE_DIR = Path(__file__).parent
+
+# Construct path to assets
+asset_path = BASE_DIR / "assets" / "file.csv"
 
 def get_connection():
     """Establish a SQLite database connection.
@@ -12,12 +19,12 @@ def get_connection():
     Returns:
         sqlite3.Connection: Connection object to interact with the database.
     """
-    conn = sqlite3.connect(r"assets\music_data.db")
-    tracks_csv = r'assets\tracks.csv'
-    albums_csv = r'assets\albums.csv'
-    artists_csv = r'assets\artists.csv'
-    track_artists_csv = r'assets\track_artists.csv'
-    track_features_csv = r'track_features.csv'
+    conn = sqlite3.connect(BASE_DIR / "assets" / "music_data.db")
+    tracks_csv = BASE_DIR / "assets" / 'tracks.csv'
+    albums_csv = BASE_DIR / "assets" / 'albums.csv'
+    artists_csv = BASE_DIR / "assets" / 'artists.csv'
+    track_artists_csv = BASE_DIR / "assets" / 'track_artists.csv'
+    track_features_csv = BASE_DIR / "assets" / 'track_features.csv'
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS tracks (
         track_id TEXT PRIMARY KEY,
