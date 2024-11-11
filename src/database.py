@@ -1,158 +1,127 @@
 import sqlite3
-
-import numpy as np
+from functools import lru_cache
 import pandas as pd
-
+import numpy as np
+from typing import Optional, Dict, List, Union
+from models import Song, UserPreferences
 from queries import GET_ALL_ARTIST_PROFILES, GET_ARTIST_PROFILE, GET_SONGS_FOR_ARTIST
+from pathlib import Path
 
+# Get the directory containing your streamlit app
+BASE_DIR = Path(__file__).parent
 
-def get_connection():
-    """Establish a SQLite database connection.
+class Database:
+    def __init__(self, db_path= BASE_DIR / "assets" / "music_data.db"):
+        self.db_path = db_path
 
-    Returns:
-        sqlite3.Connection: Connection object to interact with the database.
-    """
-    return sqlite3.connect("assets\music_data.db")
+    def get_connection(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.db_path)
 
+    @lru_cache(maxsize=1000)
+    def get_artist_profile(self, artist_id: int) -> Optional[Dict]:
+        """Cached artist profile retrieval."""
+        with self.get_connection() as conn:
+            artist_profile = pd.read_sql_query(
+                GET_ARTIST_PROFILE, conn, params=(artist_id,)
+            )
+            return artist_profile.to_dict(orient="records")[0] if not artist_profile.empty else None
 
-def get_artist_profile(artist_id):
-    """Fetch a specific artist's profile from the database.
+    @lru_cache(maxsize=1)
+    def get_artist_profiles(self) -> Optional[pd.DataFrame]:
+        """Cached retrieval of all artist profiles."""
+        with self.get_connection() as conn:
+            artist_profiles = pd.read_sql_query(GET_ALL_ARTIST_PROFILES, conn)
+            return artist_profiles if not artist_profiles.empty else None
 
-    Args:
-        artist_id (int): The unique ID of the artist.
+    def find_best_song(
+        self, 
+        artist_id: int, 
+        user_preferences: UserPreferences
+    ) -> Optional[Song]:
+        """Find best matching song with proper Series handling."""
+        try:
+            with self.get_connection() as conn:
+                query = """
+                SELECT 
+                    t.track_id, t.track_name, t.popularity, t.duration_ms,
+                    a.album_name, a.album_image_url,
+                    ar.artist_name,
+                    tf.*,
+                    t.track_external_url,
+                    t.uri
+                FROM tracks t
+                JOIN track_features tf ON t.track_id = tf.track_id
+                JOIN track_artists ta ON ta.track_id = t.track_id
+                JOIN artists ar ON ar.artist_id = ta.artist_id
+                JOIN albums a ON t.album_id = a.album_id
+                WHERE ar.artist_id = ?
+                """
+                songs_df = pd.read_sql_query(query, conn, params=(artist_id,))
+                
+                if songs_df.empty:
+                    return None
 
-    Returns:
-        dict or None: A dictionary with the artist's profile data, or None if not found.
-    """
-    conn = get_connection()
-    artist_profile = pd.read_sql_query(GET_ARTIST_PROFILE, conn, params=(artist_id,))
-    conn.close()
+                # Calculate similarity using vectorized operations
+                features = [
+                    "danceability", "energy", "acousticness",
+                    "instrumentalness", "liveness", "valence", "loudness"
+                ]
+                
+                song_vectors = songs_df[features].values
+                pref_vector = np.array([
+                    getattr(user_preferences, f) for f in features
+                ])
+                
+                distances = np.linalg.norm(song_vectors - pref_vector, axis=1)
+                similarities = 1 / (1 + distances)
+                
+                best_song = songs_df.iloc[similarities.argmax()]
+                
+                # Convert Series values to proper types
+                return Song(
+                    track_name=str(best_song["track_name"]),
+                    artist_name=str(best_song["artist_name"]),
+                    album_image_url=str(best_song["album_image_url"]),
+                    album_name=str(best_song["album_name"]),
+                    popularity=int(best_song["popularity"]),
+                    uri=str(best_song["uri"]),
+                    track_external_url=str(best_song["track_external_url"])
+                )
+                
+        except Exception as e:
+            print(f"Error finding best song: {str(e)}")
+            return None
 
-    return (
-        artist_profile.to_dict(orient="records")[0]
-        if not artist_profile.empty
-        else None
-    )
-
-
-def get_artist_profiles():
-    """Fetch all artist profiles from the database.
-
-    Returns:
-        pd.DataFrame or None: DataFrame containing profiles for all artists, or None if no data.
-    """
-    conn = get_connection()
-    artist_profiles = pd.read_sql_query(GET_ALL_ARTIST_PROFILES, conn)
-    conn.close()
-
-    return artist_profiles if not artist_profiles.empty else None
-
-
-def find_best_song(artist_id, user_preferences):
-    """Find the song most similar to user preferences for a given artist.
-
-    Args:
-        artist_id (int): The unique ID of the artist.
-        user_preferences (dict): Dictionary of user preference values for musical features.
-
-    Returns:
-        dict or None: Dictionary with the top song's name and artist name, or None if no songs are found.
-    """
-    conn = get_connection()
-    songs_df = pd.read_sql_query(GET_SONGS_FOR_ARTIST, conn, params=(artist_id,))
-    conn.close()
-
-    if songs_df.empty:
-        return None
-
-    # Calculate Euclidean similarity with user preferences
-    song_predictors = songs_df[
-        [
-            "danceability",
-            "energy",
-            "acousticness",
-            "instrumentalness",
-            "liveness",
-            "valence",
-            "loudness"
+    def find_top_k_artists(
+        self, 
+        artist_profiles: pd.DataFrame, 
+        selected_artist_profile: Union[Dict, UserPreferences], 
+        k: int = 10, 
+        epsilon: float = 1
+    ) -> pd.DataFrame:
+        """Find similar artists with better user preferences handling."""
+        features = [
+            "danceability", "energy", "acousticness",
+            "instrumentalness", "liveness", "valence"
         ]
-    ]
-    song_distances = np.sqrt(
-        ((song_predictors - pd.Series(user_preferences)) ** 2).sum(axis=1)
-    )
-    song_similarities = 1 / (1 + song_distances)
-
-    songs_df["similarity"] = song_similarities
-
-    # Sort by similarity and get the top song
-    top_song = songs_df.sort_values(by="similarity", ascending=False).iloc[0]
-    return {
-        "artist_name": top_song["artist_name"],
-        "track_name": top_song["track_name"],
-        "album_image_url": top_song["album_image_url"],
-        "album_name":top_song["album_name"],
-        'popularity': top_song['popularity'],
-        'uri': top_song['uri'],
-        "track_external_url":top_song["track_external_url"]
-    }
-
-
-def find_top_k_artists(artist_profiles, selected_artist_profile, k=10, epsilon=1):
-    """Find the top k artists similar to a given artist profile based on musical features.
-
-    Args:
-        artist_profiles (pd.DataFrame): DataFrame containing profiles of multiple artists.
-        selected_artist_profile (dict or pd.Series): Profile of the selected artist for comparison.
-        k (int): Number of top similar artists to return.
-        epsilon (float): Small value added to distance to prevent division by zero.
-
-    Returns:
-        pd.DataFrame: DataFrame with the top k artists and their similarity scores.
-    """
-    if isinstance(selected_artist_profile, dict):
-        selected_artist_profile = pd.Series(selected_artist_profile)
-
-    # Select predictors and convert to a NumPy array with float64 dtype
-    predictors = np.array(
-        artist_profiles[
-            [
-                "danceability",
-                "energy",
-                "acousticness",
-                "instrumentalness",
-                "liveness",
-                "valence",
-            ]
-        ],
-        dtype=np.float64,
-    )
-
-    reference_values = np.array(
-        selected_artist_profile[
-            [
-                "danceability",
-                "energy",
-                "acousticness",
-                "instrumentalness",
-                "liveness",
-                "valence",
-            ]
-        ],
-        dtype=np.float64,
-    )
-
-    try:
-        diff = predictors - reference_values
-        squared_diff = diff**2
-        summed_squared_diff = np.sum(squared_diff, axis=1)
-        distances = np.sqrt(summed_squared_diff)
+        
+        # Handle both Dict and UserPreferences inputs
+        if isinstance(selected_artist_profile, UserPreferences):
+            profile_vector = np.array([
+                getattr(selected_artist_profile, f) for f in features
+            ])
+        else:
+            profile_vector = np.array([
+                selected_artist_profile[f] for f in features
+            ])
+            
+        artist_vectors = artist_profiles[features].values
+        
+        # Compute similarities
+        differences = artist_vectors - profile_vector
+        distances = np.sqrt(np.sum(differences ** 2, axis=1))
         similarities = 1 / (epsilon + distances)
-    except Exception as e:
-        print("An error occurred in the similarity calculation steps:", e)
-        raise
-
-    artist_profiles = artist_profiles.copy()
-    artist_profiles["similarity"] = similarities
-    top_artists = artist_profiles.sort_values(by="similarity", ascending=False).head(k)
-
-    return top_artists
+        
+        artist_profiles = artist_profiles.copy()
+        artist_profiles["similarity"] = similarities
+        return artist_profiles.nlargest(k, "similarity")
