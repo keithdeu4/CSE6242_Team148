@@ -26,7 +26,8 @@ class SessionState:
             
         if "need_recommendations" not in st.session_state:
             st.session_state.need_recommendations = True
-
+        if "last_selected_artist" not in st.session_state:
+            st.session_state.last_selected_artist = None
         # UI state
         if "playlist_filter" not in st.session_state:
             st.session_state.playlist_filter = ""
