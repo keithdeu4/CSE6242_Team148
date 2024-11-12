@@ -110,10 +110,18 @@ class Database:
             profile_vector = np.array([
                 getattr(selected_artist_profile, f) for f in features
             ])
+            current_artist_name = None  # No artist to exclude for user preferences
         else:
             profile_vector = np.array([
                 selected_artist_profile[f] for f in features
             ])
+            current_artist_name = selected_artist_profile.get('artist_name')
+        
+        # Filter out current artist if it exists
+        if current_artist_name:
+            artist_profiles = artist_profiles[
+                artist_profiles['artist_name'] != current_artist_name
+            ].copy()
             
         artist_vectors = artist_profiles[features].values
         
