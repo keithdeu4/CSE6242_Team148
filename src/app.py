@@ -12,6 +12,7 @@ from graphs import display_saved_graphs
 from state_management import SessionState
 from visualizations import plot_pca_visualization
 from models import AudioFeature, UserPreferences, Song
+from genre_profiles import GenreProfileManager
 
 class PlaylistStats(BaseModel):
     total_songs: int
@@ -88,7 +89,7 @@ class PlaylistManager:
 
             with col2:
                 if song.album_image_url:
-                    st.image(song.album_image_url, use_column_width=True)
+                    st.image(song.album_image_url, use_container_width=True)
 
             st.divider()
 
@@ -205,8 +206,39 @@ class PreferencesUI:
         }
 
     @classmethod
+    def render_genre_selector(cls) -> Optional[UserPreferences]:
+        """Render genre selector UI and return preferences if a genre is selected."""
+        st.markdown("### 🎸 Quick Start with Genres")
+        
+        # Get genre profiles
+        profiles = GenreProfileManager.get_profiles()
+        
+        # Create genre selector
+        selected_genre = st.selectbox(
+            "Select a genre to set your preferences:",
+            options=list(profiles.keys()),
+            format_func=lambda x: f"{profiles[x].icon} {x}",
+            key='genre_selector'
+        )
+        
+        if selected_genre:
+            profile = profiles[selected_genre]
+            st.caption(profile.description)
+            
+            if st.button(f"Apply {selected_genre} Preferences"):
+                return UserPreferences(**profile.features)
+        
+        return None
+
+    @classmethod
     def render_preferences_ui(cls, user_preferences: UserPreferences) -> UserPreferences:
         """Render the preferences UI and return updated preferences."""
+        # Add genre selector at the top
+        genre_preferences = cls.render_genre_selector()
+        if genre_preferences:
+            return genre_preferences
+            
+        # Rest of your existing render_preferences_ui code...
         show_help = st.toggle("Show feature explanations", value=False)
         st.markdown("Use the controls below to set your music preferences:")
 

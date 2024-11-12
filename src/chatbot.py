@@ -20,6 +20,8 @@ class NetworkGraphBuilder:
     ) -> Network:
         """Create network graph of artist similarities."""
         graph = self._initialize_graph()
+        
+        # Add all nodes first
         self._add_main_artist_node(graph, selected_artist)
         self._add_similar_artist_nodes(
             graph, 
@@ -27,7 +29,39 @@ class NetworkGraphBuilder:
             selected_artist["artist_name"],
             excluded_artists
         )
-        self._add_connections(graph, similar_artists, selected_artist["artist_name"])
+        
+        # Then add connections between nodes that exist
+        existing_nodes = set(graph.get_nodes())
+        sorted_artists = similar_artists.sort_values('similarity', ascending=False)
+        
+        similarity_threshold = 0.70
+        max_secondary_connections = 3
+        
+        for i, artist1 in sorted_artists.iterrows():
+            if artist1["artist_name"] not in existing_nodes:
+                continue
+                
+            secondary_connections = 0
+            for j, artist2 in sorted_artists.iterrows():
+                if (
+                    i < j 
+                    and artist1["artist_name"] != selected_artist["artist_name"]
+                    and artist2["artist_name"] != selected_artist["artist_name"]
+                    and artist2["artist_name"] in existing_nodes
+                    and secondary_connections < max_secondary_connections
+                ):
+                    similarity_score = artist1["similarity"] * artist2["similarity"]
+                    if similarity_score > similarity_threshold:
+                        edge_width = (similarity_score - similarity_threshold) * 2
+                        graph.add_edge(
+                            artist1["artist_name"],
+                            artist2["artist_name"],
+                            value=similarity_score,
+                            width=edge_width,
+                            title=f"Similarity: {similarity_score:.2f}",
+                        )
+                        secondary_connections += 1
+        
         return graph
 
     def _initialize_graph(self) -> Network:
@@ -97,39 +131,6 @@ class NetworkGraphBuilder:
                 width=edge_width,
                 title=f"Similarity: {artist['similarity']:.2f}",
             )
-
-    def _add_connections(
-        self, 
-        graph: Network, 
-        similar_artists: pd.DataFrame,
-        main_artist: str
-    ) -> None:
-        """Add connections between similar artists."""
-        similarity_threshold = 0.85
-        max_secondary_connections = 3
-        
-        sorted_artists = similar_artists.sort_values('similarity', ascending=False)
-        
-        for i, artist1 in sorted_artists.iterrows():
-            secondary_connections = 0
-            for j, artist2 in sorted_artists.iterrows():
-                if (
-                    i < j 
-                    and artist1["artist_name"] != main_artist
-                    and artist2["artist_name"] != main_artist
-                    and secondary_connections < max_secondary_connections
-                ):
-                    similarity_score = artist1["similarity"] * artist2["similarity"]
-                    if similarity_score > similarity_threshold:
-                        edge_width = (similarity_score - similarity_threshold) * 2
-                        graph.add_edge(
-                            artist1["artist_name"],
-                            artist2["artist_name"],
-                            value=similarity_score,
-                            width=edge_width,
-                            title=f"Similarity: {similarity_score:.2f}",
-                        )
-                        secondary_connections += 1
 
     def _generate_hover_info(
         self, 
@@ -218,7 +219,7 @@ class Chatbot:
     def run(self) -> None:
         """Main chatbot loop."""
         st.markdown("## 💬 Chat")
-        
+                   
         # Display initial recommendations if needed
         if st.session_state.get("need_recommendations", True):
             self.show_initial_recommendations()
@@ -235,12 +236,36 @@ class Chatbot:
         """Display the chat history."""
         # Create a container for messages
         with st.container():
-            for message in st.session_state.messages:
+            for idx, message in enumerate(st.session_state.messages):
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
                     if "graph" in message:
                         st.components.v1.html(message["graph"], height=750)
-
+                    if "artists" in message:
+                        selected_artist = st.pills(
+                            "Artists",
+                            options=message["artists"],
+                            key=f"pills_{idx}",  # Simplified key
+                            selection_mode="single",
+                            format_func=lambda x: f"🎵 {x}"
+                        )
+                        if selected_artist and selected_artist != st.session_state.get('last_selected_artist'):
+                            st.session_state.last_selected_artist = selected_artist
+                            if "last_processed_song" not in st.session_state:
+                                st.session_state.last_processed_song = set()
+                                
+                            # Process the selection only if not already processed
+                            song = self.handle_artist_selection(selected_artist, st.session_state.user_preferences)
+                            if song:
+                                # Check if this song was already processed
+                                song_key = f"{song.artist_name}_{song.track_name}"
+                                if song_key not in st.session_state.last_processed_song:
+                                    st.session_state.last_processed_song.add(song_key)
+                                    self.handle_successful_match(selected_artist, song)
+                            else:
+                                self.handle_failed_match()
+                            st.rerun()
+                            
     def process_user_input(self, user_input: str):
         """Process user input and update chat."""
         # Add user message
@@ -269,7 +294,7 @@ class Chatbot:
         top_artists = self.database.find_top_k_artists(
             artist_profiles=st.session_state.artist_profiles,
             selected_artist_profile=st.session_state.user_preferences,
-            k=5
+            k=15
         )
 
         # Create a pseudo-artist dict for the user node
@@ -342,6 +367,7 @@ class Chatbot:
                 "to see more details. Type an artist's name to explore their music and "
                 "find similar artists."
             ),
+            "artists": [artist["artist_name"] for artist in top_artists_dict],
             "graph": graph_html
         })
         
@@ -401,20 +427,24 @@ class Chatbot:
         similar_artists = self.database.find_top_k_artists(
             st.session_state.artist_profiles,
             selected_artist,
-            k=10
+            k=15
         )
 
         # Generate and save graph
         graph_html = self.generate_artist_graph(selected_artist, similar_artists)
-
+        for msg in st.session_state.messages:
+            if "graph" in msg:
+                del msg["graph"]
+            if "artists" in msg:
+                del msg["artists"]
         # Add both response messages to session state
         st.session_state.messages.extend([
             {
                 "role": "assistant",
                 "content": (
-                    f"The best matching song by **{artist_name}** is "
-                    f"**{song.track_name}**! It has been added to your playlist.\n\n"
-                    f"Here's a visualization of similar artists based on your preferences:"
+                    f"💿 I've found a song that matches your preferences:\n\n"
+                    f"**{song.track_name}** by **{song.artist_name}**\n\n"
+                    f"I've added it to your playlist! Here are some similar artists:"
                 ),
                 "graph": graph_html
             },
@@ -424,7 +454,8 @@ class Chatbot:
                     "Would you like to explore another artist? Type another artist name, "
                     "or adjust your preferences in the sidebar and click 'Find Matching "
                     "Artists' for new recommendations."
-                )
+                ),
+                "artists": similar_artists["artist_name"].tolist()
             }
         ])
 
