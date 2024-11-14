@@ -279,8 +279,6 @@ class PreferencesUI:
                         horizontal=True,
                         label_visibility="collapsed"
                     )
-                    # Convert binary choice back to float value
-                    value = 0.8 if value else 0.2
 
                 updated_values[feature_key] = value
                 st.divider()
