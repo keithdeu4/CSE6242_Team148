@@ -6,13 +6,20 @@ from typing import Optional, Dict, List, Union
 from models import Song, UserPreferences
 from queries import GET_ALL_ARTIST_PROFILES, GET_ARTIST_PROFILE, GET_SONGS_FOR_ARTIST
 from pathlib import Path
-
+import gzip
+import shutil
 # Get the directory containing your streamlit app
 BASE_DIR = Path(__file__).parent
 
 class Database:
     def __init__(self, db_path= BASE_DIR / "assets" / "music_data.db"):
         self.db_path = db_path
+        compressed_file_path = f'{db_path}.gz'
+
+        # Decompress the file
+        with gzip.open(compressed_file_path, 'rb') as compressed_file:
+            with open(db_path, 'wb') as db_file:
+                shutil.copyfileobj(compressed_file, db_file)
 
     def get_connection(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
