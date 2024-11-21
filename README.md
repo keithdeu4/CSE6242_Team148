@@ -78,26 +78,16 @@ This is a Streamlit-based application that recommends personalized playlists bas
    poetry shell
    ```
 
-4. **Prepare the Database**:
-   - Place `music_data.db` in the root directory
-   - Database schema:
-     ```sql
-     -- Artist profiles table structure
-     CREATE TABLE artist_profiles (
-         artist_id TEXT PRIMARY KEY,
-         artist_name TEXT,
-         artist_popularity INTEGER,
-         -- Other feature columns
-     );
+4. **Data Preparation**
+To retrieve and prepare data for this project:
 
-     -- Songs table structure
-     CREATE TABLE songs (
-         track_id TEXT PRIMARY KEY,
-         track_name TEXT,
-         artist_id TEXT,
-         -- Other song columns
-     );
-     ```
+1. **Retrieve Random Spotify Tracks**:
+   - Use the `notebooks/retrieve_random_spotify_tracks.ipynb` to download random tracks.
+
+2. **Generate Synthetic Data** *(Optional)*:
+   - Use the `notebooks/prepare_data.ipynb` to clean Spotify tracks and create necessary database.
+
+The datasets will be saved in the `src/assets/` folder automatically.
 
 5. **Run the Streamlit App**:
    ```bash
@@ -121,26 +111,38 @@ This is a Streamlit-based application that recommends personalized playlists bas
 
 ### Exploring Visualizations
 - Switch between tabs for different views
-- Interact with graphs using mous
+- Interact with graphs using mouse
 - Hover over elements for detailed information
 - Use controls to adjust visualization parameters
 
 ## Project Structure
 ```plaintext
-spotify-playlist-generator/
+spotify-graph-playlist/
 ├── src/
 │   ├── app.py                 # Main Streamlit app
 │   ├── chatbot.py             # Chatbot functionality
 │   ├── database.py            # Database connection and queries
-│   ├── queries.py             # SQL queries for database operations
+│   ├── genre_profiles.py      # Functions for processing genres
+│   ├── graphs.py              # Functions for visualizing graphs
+│   ├── models.py              # Recommendation and ML models
+│   ├── queries.py             # SQL queries and database operations
 │   ├── state_management.py    # Session state initialization
-│   ├── visualizations.py      # PCA and plot visualizations
-│   └── graphs.py              # Functions for displaying saved graphs
-├── music_data.db              # SQLite database with Spotify data
-├── pyproject.toml             # Poetry configuration file
+│   ├── synthetic_data.py      # Synthetic data generation helpers
+│   ├── visualizations.py      # Visualizations for recommendations
+├── notebooks/
+│   ├── prepare_data.ipynb     # Notebook for preparing Spotify tracks
+│   ├── synthetic_data.ipynb   # Notebook for creating synthetic data
+│   ├── retrieve_random_spotify_tracks.ipynb   # Notebook for downloading random tracks from spotify
+├── src/assets/                # Data files and saved graph data
+│   ├── albums.csv
+│   ├── artists.csv
+│   ├── track_artists.csv
+│   ├── track_features.csv
+│   ├── track_genres.csv
+│   ├── tracks.csv
 ├── images/                    # Screenshot and diagram assets
-└── README.md                  # Project documentation
 ```
+
 
 ## Dependencies
 Main packages (managed through Poetry):
@@ -154,6 +156,3 @@ Main packages (managed through Poetry):
 1. Fork the repository
 2. Create a new branch for your feature
 3. Submit a pull request with a clear description
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
