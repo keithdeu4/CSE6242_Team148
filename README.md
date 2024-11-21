@@ -12,7 +12,7 @@ This is a Streamlit-based application that recommends personalized playlists bas
 - Get tailored artist and song recommendations based on:
   - Danceability
   - Energy
-  - Style (Acoustic/Electric)
+  - Style (Acoustic/Electronic)
   - Vocals (Instrumental/With Vocals)
   - Recording Type (Studio/Live)
   - Mood
